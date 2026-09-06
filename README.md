@@ -40,16 +40,19 @@ no email address survives anywhere outside opaque `UID` values.
 
 ## Install
 
-Needs [Nix](https://nixos.org/download) and systemd.
+Needs [Nix](https://nixos.org/download) with flakes, and systemd.
 
 ```sh
-./install.sh
+nix run .#install
 ```
 
 It builds with Nix, installs into `~/.nix-profile`, writes
 `~/.config/calendar-sharer/env` (mode 0600), enables an hourly user timer, and
 smoke-tests under `systemd-run` — not your interactive shell, which has a
 different environment and would pass where the timer fails.
+
+Re-run `nix run .#install` to upgrade; the profile pins one exact build. To run
+the CLI without installing, `nix run . -- doctor`.
 
 The binary deliberately lives in the Nix store rather than beside this checkout:
 a repo on a removable or LUKS volume is not mounted at boot, and a
@@ -66,8 +69,11 @@ a repo on a removable or LUKS volume is not mounted at boot, and a
      is the whole reason this uses a static key.
    - It issues an **Access Key ID** and **Secret Access Key** → `R2_ACCESS_KEY_ID`
      and `R2_SECRET_ACCESS_KEY`. `R2_ACCOUNT_ID` is on the R2 overview page.
-3. Connect a custom domain to the bucket. Leave the `r2.dev` subdomain off;
-   Cloudflare documents it as rate-limited and development-only.
+3. Bucket → Settings → **Public access → Custom Domains → Connect Domain**.
+   This creates the DNS record for you, so until you do it the hostname simply
+   will not resolve and nothing can fetch the feed. Set `PUBLIC_BASE_URL` to
+   `https://` + that hostname. Leave the `r2.dev` subdomain off; Cloudflare
+   documents it as rate-limited and development-only.
 
 R2 public buckets never expose listing. Since the token *is* the filename, that
 matters: on GCS the obvious role (`roles/storage.objectViewer`) includes
