@@ -1,0 +1,17 @@
+[Unit]
+Description=Rebuild and publish the merged calendar feed
+Documentation=https://github.com/karmanyaahm/calendar-sharer
+
+[Service]
+Type=oneshot
+# NOTE: Restart= is not permitted on Type=oneshot and makes the unit fail to
+# load. Retry/backoff lives inside the script instead (caldav.BACKOFF), which
+# also covers the real problem: no network yet after resume-from-suspend.
+EnvironmentFile=%h/.config/calendar-sharer/env
+ExecStart=%h/.nix-profile/bin/calendar-sharer generate
+# Worst case is 22 calendars x (30+120+300)s of backoff; this is generous
+# headroom over the realistic case of one calendar retrying.
+TimeoutStartSec=1800
+
+# Deliberately no [Install]: this unit is triggered by the timer. Enabling it
+# directly would run a full generate at every login.

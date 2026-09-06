@@ -1,0 +1,15 @@
+# secrets and local state
+.env
+tokens.json
+state.json
+
+# personal calendar data pulled for tests
+fixtures/
+
+# build output
+result
+result-*
+__pycache__/
+*.pyc
+.pytest_cache/
+feed.preview.ics

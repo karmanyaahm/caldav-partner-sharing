@@ -1,0 +1,12 @@
+[Unit]
+Description=Hourly rebuild of the merged calendar feed
+
+[Timer]
+OnCalendar=hourly
+# Persistent only has an effect alongside OnCalendar. It is what makes a laptop
+# viable: a run missed while asleep or powered off fires shortly after wake.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
