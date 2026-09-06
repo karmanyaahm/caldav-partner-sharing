@@ -1,11 +1,16 @@
-# calendar-sharer
+# caldav-partner-sharing
 
-Merges your Fastmail calendars into one `.ics` and publishes it at a separate,
-unguessable URL per recipient — so you can **revoke one person** without
-disturbing anyone else.
+Share your CalDAV calendar with a partner, a friend, a team — one merged `.ics`
+at a separate unguessable URL per person, so you can **revoke one of them**
+without disturbing anyone else.
+
+Built against Fastmail, but the CalDAV side is standard; only the discovery URL
+in `caldav.py` is Fastmail-specific.
 
 Fastmail's own publish URL cannot do that. Hand it to five people and you can
 never cut off just one. That is the entire reason this exists.
+
+The command is `calendar-sharer`; the repository is `caldav-partner-sharing`.
 
 ```
 laptop (systemd timer, hourly)

@@ -1,6 +1,6 @@
 [Unit]
 Description=Rebuild and publish the merged calendar feed
-Documentation=https://github.com/karmanyaahm/calendar-sharer
+Documentation=https://github.com/karmanyaahm/caldav-partner-sharing
 
 [Service]
 Type=oneshot
