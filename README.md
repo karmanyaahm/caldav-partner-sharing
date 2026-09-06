@@ -46,17 +46,30 @@ Needs [Nix](https://nixos.org/download) with flakes, and systemd.
 nix run .#install
 ```
 
-It builds with Nix, installs into `~/.nix-profile`, writes
-`~/.config/calendar-sharer/env` (mode 0600), enables an hourly user timer, and
-smoke-tests under `systemd-run` — not your interactive shell, which has a
-different environment and would pass where the timer fails.
+**Nothing is installed into `PATH`.** The only artifacts are two symlinks:
 
-Re-run `nix run .#install` to upgrade; the profile pins one exact build. To run
-the CLI without installing, `nix run . -- doctor`.
+```
+~/.config/systemd/user/calendar-sharer.service -> /nix/store/...-calendar-sharer-units/
+~/.config/systemd/user/calendar-sharer.timer   -> /nix/store/...-calendar-sharer-units/
+```
 
-The binary deliberately lives in the Nix store rather than beside this checkout:
-a repo on a removable or LUKS volume is not mounted at boot, and a
-`Persistent=true` timer fires its catch-up run before such a volume exists.
+The unit's `ExecStart` is an absolute store path, substituted at build time.
+That matters beyond tidiness: the user manager's `PATH` at boot is the
+compiled-in default, so a bare command name there would be a coin flip.
+
+A third symlink at `/nix/var/nix/gcroots/calendar-sharer` roots the units
+against garbage collection. It is required — a symlink in `~/.config` is *not*
+a GC root, so without it `nix-collect-garbage` would delete the interpreter and
+code the timer depends on. Rooting the units is enough: the store path appears
+in the unit text, so Nix records it as a reference and keeps the whole closure.
+
+The installer seeds from a `.env` in the working directory if one exists, then
+prompts for anything missing, and smoke-tests under `systemd-run` — not your
+interactive shell, which has a different environment and would pass where the
+timer fails.
+
+Re-run `nix run .#install` to upgrade; it re-points the symlinks and the GC root
+at the new build.
 
 ### Cloudflare setup (once)
 
@@ -75,20 +88,23 @@ a repo on a removable or LUKS volume is not mounted at boot, and a
    `https://` + that hostname. Leave the `r2.dev` subdomain off; Cloudflare
    documents it as rate-limited and development-only.
 
-R2 public buckets never expose listing. Since the token *is* the filename, that
-matters: on GCS the obvious role (`roles/storage.objectViewer`) includes
-`storage.objects.list` and would publish every token at one anonymous URL.
-
 ## Use
 
+Since nothing is on `PATH`, invoke it through the flake. The timer runs itself;
+these are for managing recipients.
+
 ```sh
-calendar-sharer token add alice      # mint a URL for one recipient
-calendar-sharer token list           # who has what
-calendar-sharer generate             # build + publish now
-calendar-sharer generate --dry-run   # build locally, upload nothing
-calendar-sharer doctor               # health; finds orphaned objects; confirms
-                                     # the bucket is not publicly listable
+nix run . -- token add alice      # mint a URL for one recipient
+nix run . -- token list           # who has what
+nix run . -- generate             # build + publish now
+nix run . -- generate --dry-run   # build locally, upload nothing
+nix run . -- doctor               # health; finds orphaned objects; confirms
+                                  # the bucket is not publicly listable
 ```
+
+From outside the checkout, use the path: `nix run /path/to/calendar-sharer -- doctor`.
+If you do want a short command, add a shell alias rather than installing into
+your profile — that keeps the store path pinned by the GC root above.
 
 ### Revoking
 
@@ -98,9 +114,9 @@ the recipient holding your schedule — including recurring events years out —
 indefinitely. Revocation is therefore two steps:
 
 ```sh
-calendar-sharer token revoke <token>   # serve a valid EMPTY calendar; their copy clears
+nix run . -- token revoke <token>   # serve a valid EMPTY calendar; their copy clears
 # ...wait ~48h for their client to poll...
-calendar-sharer token purge <token>    # now actually delete the object
+nix run . -- token purge <token>    # now actually delete the object
 ```
 
 ## Which calendars

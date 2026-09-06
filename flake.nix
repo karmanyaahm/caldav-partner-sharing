@@ -30,9 +30,20 @@
           meta.mainProgram = "calendar-sharer";
         };
 
+        # Units are built with an absolute store path baked into ExecStart, so
+        # nothing needs to be on PATH. Because that path appears in the unit
+        # text, Nix records it as a reference: one GC root on these units keeps
+        # the interpreter and the code alive too.
+        units = pkgs.runCommand "calendar-sharer-units" { } ''
+          mkdir -p $out
+          substitute ${./systemd/calendar-sharer.service} $out/calendar-sharer.service \
+            --replace-fail '@BIN@' '${calendar-sharer}/bin/calendar-sharer'
+          cp ${./systemd/calendar-sharer.timer} $out/calendar-sharer.timer
+        '';
+
         install = pkgs.writeShellApplication {
           name = "calendar-sharer-install";
-          runtimeInputs = [ pkgs.coreutils pkgs.gnugrep ];
+          runtimeInputs = [ pkgs.coreutils pkgs.gnugrep pkgs.gnused ];
           text = ''
             CONFIG_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/calendar-sharer"
             UNIT_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
@@ -43,19 +54,13 @@
 
             command -v systemctl >/dev/null || { echo "systemd is required"; exit 1; }
 
-            say "Installing into the user profile"
-            # Installed by store path, so the profile pins this exact build.
-            # Re-run `nix run .#install` to upgrade.
-            nix profile remove calendar-sharer 2>/dev/null || true
-            nix profile install "${calendar-sharer}"
-
             say "Configuring $ENV_FILE"
             mkdir -p "$CONFIG_DIR"
             touch "$ENV_FILE"
             chmod 600 "$ENV_FILE"
 
             # Seed from a .env in the working directory if one is present, so a
-            # config already filled in during development carries over.
+            # config filled in during development carries over.
             if [ -f .env ] && [ ! -s "$ENV_FILE" ]; then
               echo "  seeding from $PWD/.env"
               cat .env > "$ENV_FILE"
@@ -67,7 +72,6 @@
                 echo "  $key already set"
                 return
               fi
-              # Drop a placeholder line with an empty value before re-asking.
               sed -i "/^$key=$/d" "$ENV_FILE" 2>/dev/null || true
               if [ -n "$secret" ]; then
                 read -rsp "  $desc: " value; echo
@@ -87,10 +91,16 @@
             prompt_for FEED_NAME            "Calendar display name"
             chmod 600 "$ENV_FILE"
 
-            say "Installing systemd user units"
+            say "Rooting the store paths against garbage collection"
+            # The unit symlinks below point into /nix/store, but a symlink in
+            # ~/.config is not a GC root. Without this, nix-collect-garbage
+            # would delete the binary the timer depends on.
+            ln -sfn "${units}" /nix/var/nix/gcroots/calendar-sharer
+
+            say "Linking systemd user units from the store"
             mkdir -p "$UNIT_DIR"
-            install -m 644 ${./systemd}/calendar-sharer.service "$UNIT_DIR/"
-            install -m 644 ${./systemd}/calendar-sharer.timer   "$UNIT_DIR/"
+            ln -sfn "${units}/calendar-sharer.service" "$UNIT_DIR/calendar-sharer.service"
+            ln -sfn "${units}/calendar-sharer.timer"   "$UNIT_DIR/calendar-sharer.timer"
             systemctl --user daemon-reload
             systemctl --user enable --now calendar-sharer.timer
 
@@ -102,7 +112,6 @@
             say "Smoke test in the timer's environment"
             # -p EnvironmentFile is required: a transient unit inherits neither
             # this shell's environment nor the .service file's EnvironmentFile=.
-            # Running it from an interactive shell would pass where the timer fails.
             if systemd-run --user --wait --pipe --quiet \
                  --unit "calendar-sharer-smoke-$$" \
                  -p EnvironmentFile="$ENV_FILE" "$BIN" doctor; then
@@ -113,18 +122,19 @@
             fi
 
             say "Installed"
+            echo "  units   -> $UNIT_DIR/calendar-sharer.{service,timer} -> ${units}"
+            echo "  gcroot  -> /nix/var/nix/gcroots/calendar-sharer"
+            echo "  nothing was added to PATH"
             systemctl --user list-timers calendar-sharer.timer --no-pager || true
-            echo
-            echo "  calendar-sharer token add alice   mint a URL for one recipient"
-            echo "  calendar-sharer generate          build and publish now"
-            echo "  calendar-sharer doctor            health check"
           '';
         };
+
       in
       {
         packages.default = calendar-sharer;
         packages.calendar-sharer = calendar-sharer;
         packages.install = install;
+        packages.units = units;
 
         apps.default = {
           type = "app";

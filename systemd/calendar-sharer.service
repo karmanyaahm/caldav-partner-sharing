@@ -8,7 +8,9 @@ Type=oneshot
 # load. Retry/backoff lives inside the script instead (caldav.BACKOFF), which
 # also covers the real problem: no network yet after resume-from-suspend.
 EnvironmentFile=%h/.config/calendar-sharer/env
-ExecStart=%h/.nix-profile/bin/calendar-sharer generate
+# Absolute Nix store path, substituted at build time. Nothing is installed into
+# PATH, and the user manager's PATH at boot would not find it anyway.
+ExecStart=@BIN@ generate
 # Worst case is 22 calendars x (30+120+300)s of backoff; this is generous
 # headroom over the realistic case of one calendar retrying.
 TimeoutStartSec=1800
