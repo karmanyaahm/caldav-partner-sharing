@@ -7,7 +7,7 @@ original design doc (C3-, C0V, ...) do not exist on this server.
 
 EXCLUDED = {
     "75a524b5-381e-402c-b496-6515e1037fb0": "Contacts — birthdays, not events",
-    "148cb99d-d438-4af8-9ba7-8edc4ef33a76": "karmanyaahm@gmail.com — Google-synced, loop risk",
+    "148cb99d-d438-4af8-9ba7-8edc4ef33a76": "Google-synced account calendar — republishing it would loop",
     "8d83f9bd-78ba-432b-ba93-088bf13872f1": "Old NextCloud Calendar — stale",
     "974cea54-d08f-4045-b9b4-572e5f0c9277": "Old NextCloud Personal — stale",
     # Both pairs below are duplicates. The survivor is whichever the server's

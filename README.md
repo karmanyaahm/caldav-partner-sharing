@@ -16,6 +16,52 @@ laptop (systemd timer, hourly)
    https://cal.example.com/f/<token>.ics
 ```
 
+## Quick start
+
+Everything runs through the flake — nothing is installed into `PATH`.
+Run these from the repo directory (or swap `.` for its full path).
+
+```sh
+# one-time: build, configure, and enable the hourly timer
+nix run .#install
+
+# give someone the feed
+nix run . -- token add alice
+#   -> alice: https://cal.example.com/f/xK3n....ics
+#   share that URL; it appears after the next publish
+
+# publish right now instead of waiting for the timer
+nix run . -- generate
+
+# see who has what
+nix run . -- token list
+#   alice    active    https://cal.example.com/f/xK3n....ics
+#   bob      REVOKED   https://cal.example.com/f/9pQr....ics
+
+# cut one person off (two steps -- see Revoking, it matters)
+nix run . -- token revoke xK3n....
+# ...48h later...
+nix run . -- token purge xK3n....
+
+# is it healthy? did anything leak?
+nix run . -- doctor
+
+# what would be published, without publishing it
+nix run . -- generate --dry-run --output /tmp/feed.ics
+```
+
+Watch it run:
+
+```sh
+systemctl --user list-timers calendar-sharer.timer
+journalctl --user -u calendar-sharer -f
+systemctl --user start calendar-sharer.service   # trigger a run now
+```
+
+Each token is a separate URL to the same feed. Revoking one leaves every other
+recipient untouched — which is the thing Fastmail's own publish URL cannot do.
+
+
 ## What gets published
 
 Only **what / when / where**. Each event is rebuilt from a strict property

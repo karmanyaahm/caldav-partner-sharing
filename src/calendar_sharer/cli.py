@@ -18,6 +18,9 @@ from .merge import Source, empty_calendar, merge
 
 log = logging.getLogger("calendar-sharer")
 
+# Cloudflare 403s the default urllib agent, which would break the listing check.
+UA = "calendar-sharer/1.0 (+doctor)"
+
 
 def _build(cfg) -> tuple[bytes, dict, list[str]]:
     session = caldav.session_for(cfg.fm_user, cfg.fm_apppw)
@@ -196,15 +199,25 @@ def cmd_doctor(args) -> int:
         print(f"  could not list: {err}")
 
     # The token is the object key, so anonymous listing would expose every one.
+    #
+    # Send a real User-Agent: Cloudflare's bot rules 403 the default
+    # "Python-urllib/x.y", and a bot-protection 403 is indistinguishable from a
+    # "listing denied" 403 — which would make this check silently pass even if
+    # the bucket were wide open.
     print("\nbucket listing must not be public:")
     for probe in (cfg.public_base_url.rstrip("/") + "/", cfg.public_base_url.rstrip("/") + "/f/"):
+        request = urllib.request.Request(probe, headers={"User-Agent": UA})
         try:
-            with urllib.request.urlopen(probe, timeout=10) as res:
+            with urllib.request.urlopen(request, timeout=10) as res:
                 body = res.read(2048)
                 bad = b"<ListBucketResult" in body or b"<Key>" in body
-                print(f"  {probe} -> {res.status} {'!!! LISTING EXPOSED !!!' if bad else 'no listing'}")
+                verdict = "!!! LISTING EXPOSED !!!" if bad else "no listing"
+                print(f"  {probe} -> {res.status} {verdict}")
         except urllib.error.HTTPError as err:
-            print(f"  {probe} -> {err.code} (good)")
+            if err.code == 403 and "cloudflare" in str(err.headers.get("server", "")).lower():
+                print(f"  {probe} -> 403, but from bot protection; check manually")
+            else:
+                print(f"  {probe} -> {err.code} (good)")
         except Exception as err:
             print(f"  {probe} -> {err}")
     return 0
