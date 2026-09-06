@@ -1,5 +1,6 @@
 import json
 import pathlib
+from datetime import datetime, timezone
 
 import pytest
 
@@ -26,8 +27,13 @@ def sources(index):
     ]
 
 
+# The fixtures are a snapshot from this date. The feed is a rolling window, so
+# the clock must be pinned or expected counts would drift every day.
+FIXED_NOW = datetime(2026, 9, 6, 12, 0, tzinfo=timezone.utc)
+
+
 @pytest.fixture(scope="session")
 def merged(sources):
     from calendar_sharer.merge import merge
 
-    return merge(sources, cal_name="Test")
+    return merge(sources, cal_name="Test", now=FIXED_NOW)

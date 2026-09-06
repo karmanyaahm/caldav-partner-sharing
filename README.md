@@ -62,6 +62,30 @@ Each token is a separate URL to the same feed. Revoking one leaves every other
 recipient untouched — which is the thing Fastmail's own publish URL cannot do.
 
 
+## Date window
+
+The feed carries a rolling window, set by `FEED_PAST_DAYS` (default 7) and
+`FEED_FUTURE_DAYS` (default 28; empty or `0` means no future limit).
+
+**Recurring events are always kept, whatever their dates.** This is not an
+oversight. A series' `DTSTART` is its *first* occurrence, which is routinely far
+outside the window — on this account all ten live series start before it, the
+oldest by two years — so filtering on `DTSTART` would silently delete every
+recurring event in the feed. Only one-time events are windowed.
+
+The one visible consequence: a subscriber's client will render recurring events
+past the `+28d` horizon, because the feed hands over the rule rather than a list
+of occurrences. Expanding recurrences into concrete instances would enforce the
+horizon exactly, but every way that goes wrong is silent (a missed EXDATE, a DST
+edge, a mishandled override) and the failure surfaces as somebody missing a
+meeting. Keeping the rules is the loud, inert option.
+
+A series is dropped only when it *provably* has no occurrence left: `UNTIL`
+before the window and no `RDATE`. `COUNT` is never resolved — that would mean
+walking the recurrence, which is the machinery this avoids.
+
+Typical effect on this account: 1170 events in, 78 out.
+
 ## What gets published
 
 Only **what / when / where**. Each event is rebuilt from a strict property

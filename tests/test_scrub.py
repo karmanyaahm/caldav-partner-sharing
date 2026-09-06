@@ -1,11 +1,24 @@
 """The scrub is the security boundary: everything here is a leak test."""
 
 import re
+from datetime import datetime, timezone
 
 import pytest
 from icalendar import Calendar
 
-from calendar_sharer.merge import Source, merge, redact_text
+from calendar_sharer.merge import Source, redact_text
+from calendar_sharer.merge import merge as _merge
+
+# These modules build events dated 2026-01-01. The feed is now a rolling
+# window, so merges here run against a clock that contains them.
+NOW = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+
+def merge(sources, **kwargs):
+    kwargs.setdefault("now", NOW)
+    return _merge(sources, **kwargs)
+
+
 
 FORBIDDEN = ("ATTENDEE", "ORGANIZER", "DESCRIPTION", "ATTACH", "URL", "BEGIN:VALARM")
 
@@ -95,8 +108,10 @@ def test_private_events_become_busy():
 def test_real_feed_has_expected_shape(merged):
     ics, stats = merged
     assert stats.calendars == 22
-    assert stats.events == 1169
     assert stats.timezones == 10
+    # Windowed: what is kept, plus what was filtered, must equal what came in.
+    assert stats.events + stats.past_dropped + stats.future_dropped == 1169
+    assert stats.recurring > 0, "no recurring events survived the window"
 
 
 def test_real_feed_leaks_nothing(merged):

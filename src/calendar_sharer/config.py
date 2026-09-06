@@ -48,6 +48,8 @@ class Config:
     r2_bucket: str
     public_base_url: str
     feed_name: str
+    past_days: int
+    future_days: int | None
 
     @property
     def endpoint_url(self) -> str:
@@ -92,4 +94,8 @@ def load(env: dict | None = None, need_r2: bool = True) -> Config:
         r2_bucket=env.get("R2_BUCKET", ""),
         public_base_url=env.get("PUBLIC_BASE_URL", ""),
         feed_name=env.get("FEED_NAME") or "Calendar",
+        past_days=int(env.get("FEED_PAST_DAYS") or 7),
+        # Empty or 0 means no future cutoff; one-time events are then only
+        # dropped once they are past.
+        future_days=(int(env["FEED_FUTURE_DAYS"]) or None) if env.get("FEED_FUTURE_DAYS") else 28,
     )

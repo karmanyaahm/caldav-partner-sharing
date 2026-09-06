@@ -41,10 +41,18 @@ def _build(cfg) -> tuple[bytes, dict, list[str]]:
     if not sources:
         raise RuntimeError(f"no calendars fetched; {'; '.join(failed)}")
 
-    ics, stats = merge(sources, cal_name=cfg.feed_name)
+    ics, stats = merge(
+        sources,
+        cal_name=cfg.feed_name,
+        past_days=cfg.past_days,
+        future_days=cfg.future_days,
+    )
     if failed:
         log.warning("%d calendar(s) skipped; `doctor` will keep reporting them", len(failed))
-    summary = dict(stats.as_dict(), discovered=len(discovered), failed=failed, bytes=len(ics))
+    window = f"-{cfg.past_days}d/" + (f"+{cfg.future_days}d" if cfg.future_days is not None else "forever")
+    summary = dict(
+        stats.as_dict(), discovered=len(discovered), failed=failed, window=window, bytes=len(ics)
+    )
     return ics, summary, failed
 
 
@@ -63,7 +71,14 @@ def cmd_generate(args) -> int:
         ics, summary, failed = _build(cfg)
 
         if not args.force:
-            state.check(state.load(), summary["calendars"], summary["events"])
+            try:
+                state.check(state.load(), summary["calendars"], summary["events"])
+            except state.ShrinkFloor:
+                # A dry run publishes nothing, so report the shrink and carry on
+                # rather than refusing to show what would have gone out.
+                if not args.dry_run:
+                    raise
+                log.warning("shrink floor would block this run; --dry-run continues anyway")
 
         if args.dry_run:
             out = Path(args.output or "feed.preview.ics")
@@ -159,6 +174,8 @@ def cmd_doctor(args) -> int:
     table = tokens.load()
 
     print(f"config      {config.config_dir()}")
+    horizon = f"+{cfg.future_days}d" if cfg.future_days is not None else "no future limit"
+    print(f"window      one-time events: -{cfg.past_days}d / {horizon}; all recurring kept")
     print(f"tokens      {len(tokens.active())} active, {len(table)} total")
 
     if last.get("at"):

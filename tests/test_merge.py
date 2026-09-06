@@ -3,7 +3,19 @@ from datetime import datetime, timezone
 import pytest
 from icalendar import Calendar
 
-from calendar_sharer.merge import Source, empty_calendar, merge, redact_text
+from calendar_sharer.merge import Source, empty_calendar, redact_text
+from calendar_sharer.merge import merge as _merge
+
+# These modules build events dated 2026-01-01. The feed is now a rolling
+# window, so merges here run against a clock that contains them.
+NOW = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
+
+
+def merge(sources, **kwargs):
+    kwargs.setdefault("now", NOW)
+    return _merge(sources, **kwargs)
+
+
 
 
 def cal(body: str) -> str:
